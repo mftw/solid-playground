@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
-    "start": "ts-node ."
+    "start": "nodemon --exec \"ts-node .\" -e ts,tsx",
+    "start2": "ts-node ."
   },
   "devDependencies": {
     "ts-node": "^10.2.1",
@@ -11,6 +12,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "^8.3.1",
-    "graphql-yoga": "^1.18.3"
+    "graphql-yoga": "^1.18.3",
+    "nodemon": "^3.0.1"
   }
 }
