@@ -256,6 +256,23 @@ const RenderCell = (props: {
               }),
           };
         });
+
+        client
+          .mutation(
+            `
+          mutation($id: ID!, $value: Float!) {
+            setDataPoint(id: $id, value: $value) {
+              id
+            }
+          }`,
+            {
+              id: props.cell.id,
+              value: newValue,
+            }
+          )
+          .toPromise();
+
+
       }}
     />
   );

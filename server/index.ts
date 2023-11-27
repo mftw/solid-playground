@@ -150,7 +150,7 @@ const createGrid2 = (
 // const grid = createGrid(2, 10, 5);
 const grid = createGrid2(4, 8, 10);
 
-const findPointInGrid = (grid: Grid, cellId: string) => {
+const findPointInGrid_ = (grid: Grid, cellId: string) => {
   const recurse = (rows: Row[]): DataPoint | undefined => {
     for (const row of rows) {
       const dataPoint = row.cells.find((cell) => cell.id === cellId);
@@ -168,6 +168,37 @@ const findPointInGrid = (grid: Grid, cellId: string) => {
   }
   throw new Error("No data point");
 };
+
+function findPointInGrid(grid: Grid, targetId: string): DataPoint {
+  for (const row of grid.rows) {
+    const result = findDataPointInRow(row, targetId);
+    if (result) {
+      return result;
+    }
+  }
+
+  // return undefined;
+  throw new Error("No data point");
+}
+
+function findDataPointInRow(row: Row, targetId: string): DataPoint | undefined {
+  for (const cell of row.cells) {
+    if (cell.id === targetId) {
+      return cell;
+    }
+  }
+
+  if (row.subRows) {
+    for (const subRow of row.subRows) {
+      const result = findDataPointInRow(subRow, targetId);
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  return undefined;
+}
 
 const resolvers: IResolvers<any, { pubsub: PubSub; pubsub2: PubSub }> = {
   Query: {

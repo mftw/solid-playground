@@ -7,7 +7,6 @@ import {
   createEffect,
   onCleanup,
   createMemo,
-  createRenderEffect,
 } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import {
@@ -124,61 +123,31 @@ type Grid = {
 //   throw new Error("No data point");
 // };
 
-function findPointInGrid(grid: Grid, targetId: string): DataPoint {
-  for (const row of grid.rows) {
-    const result = findDataPointInRow(row, targetId);
-    if (result) {
-      return result;
-    }
-  }
-
-  throw new Error("No data point");
-}
-
-function findDataPointInRow(row: Row, targetId: string): DataPoint | undefined {
-  for (const cell of row.cells) {
-    if (cell.id === targetId) {
-      return cell;
-    }
-  }
-
-  if (row.subRows) {
-    for (const subRow of row.subRows) {
-      const result = findDataPointInRow(subRow, targetId);
-      if (result) {
-        return result;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-const getCellData = (cellId: string) => {
-  type Result = {
-    cell: DataPoint;
-    rowFamilyTree: Row[];
-    cellIndex: number;
-  };
-  const recurse = (rows: Row[], parents: Row[] = []): Result | undefined => {
-    for (const row of rows) {
-      // const dataPoint = row.cells.find(cell => cell.id === cellId);
-      const cellIndex = row.cells.findIndex(cell => cell.id === cellId);
-      if (cellIndex !== -1) {
-        const cell = row.cells[cellIndex];
-        return { cell, cellIndex, rowFamilyTree: [...parents, row] };
-      }
-      if (row.subRows) {
-        return recurse(row.subRows, [...parents, row]);
-      }
-    }
-  };
-  const dataPoint = recurse(store.rows);
-  if (dataPoint) {
-    return dataPoint;
-  }
-  throw new Error("No data point");
-};
+// const getCellData = (cellId: string) => {
+//   type Result = {
+//     cell: DataPoint;
+//     rowFamilyTree: Row[];
+//     cellIndex: number;
+//   };
+//   const recurse = (rows: Row[], parents: Row[] = []): Result | undefined => {
+//     for (const row of rows) {
+//       // const dataPoint = row.cells.find(cell => cell.id === cellId);
+//       const cellIndex = row.cells.findIndex(cell => cell.id === cellId);
+//       if (cellIndex !== -1) {
+//         const cell = row.cells[cellIndex];
+//         return { cell, cellIndex, rowFamilyTree: [...parents, row] };
+//       }
+//       if (row.subRows) {
+//         return recurse(row.subRows, [...parents, row]);
+//       }
+//     }
+//   };
+//   const dataPoint = recurse(store.rows);
+//   if (dataPoint) {
+//     return dataPoint;
+//   }
+//   throw new Error("No data point");
+// };
 
 pipe(
   client.query(
@@ -231,33 +200,70 @@ pipe(
 
 const [store, setStore] = createStore<Grid>({ rows: [] });
 
+pipe(
+  client.subscription(
+    `
+  subscription GridSub {
+    grid {
+      id
+      value
+    }
+  }
+`,
+    {}
+  ),
+  subscribe(result => {
+    const { id, value } = result.data.grid as DataPoint;
+    setCellValue(id, value);
+  })
+);
+
 const setCellValue = (id: string, val: number) =>
   setStore(
     produce(store => {
-      console.log("🚀 ~ file: App.tsx:232 ~ id:", id);
-      const cell = findPointInGrid(store as Grid, id);
+      // console.log("🚀 ~ file: App.tsx:232 ~ id:", id);
+      const { cell, rows, cellIndex } = findPointInGrid(store as Grid, id);
+      const currentValue = cell.value;
       cell.value = val;
+      const diff = currentValue - val;
+      console.log(rows);
+      rows.forEach(row => {
+        const cell = row.cells[cellIndex];
+        cell.value -= diff
+      })
     })
   );
 
-// pipe(
-//   client.query(
-//     `
-//     query {
-//       getMousePos {
-//         x
-//         y
-//       }
-//     }
-//   `,
-//     {}
-//   ),
-//   subscribe((result) => {
-//     // if (!store.rows.length) {
-//     // }
-//     setMouseState(result.data.getMousePos);
-//   })
-// );
+function findPointInGrid(grid: Grid, targetId: string) {
+  for (const row of grid.rows) {
+    const result = findDataPointInRow(row, targetId);
+    if (result) {
+      return result;
+    }
+  }
+
+  throw new Error("No data point");
+}
+
+function findDataPointInRow(row: Row, targetId: string, parentRows: Row[] = []): { cell: DataPoint; rows: Row[], cellIndex: number } | undefined {
+  for (let i = 0; i < row.cells.length; i++) {
+    const cell = row.cells[i];
+    if (cell.id === targetId) {
+      return { cell, rows: [...parentRows, row], cellIndex: i };
+    }
+  }
+
+  if (row.subRows) {
+    for (const subRow of row.subRows) {
+      const result = findDataPointInRow(subRow, targetId, [...parentRows, row]);
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  return undefined;
+}
 
 pipe(
   client.subscription(
@@ -298,30 +304,10 @@ const MousePosIndicator = () => {
 };
 
 const App: Component = () => {
-  // const totalsOfTotals = createMemo<number[]>(() => {
-  //   if (!store.rows?.length) {
-  //     return [];
-  //   }
-  //   const length = store.rows[0].cells.length;
-  //   const totals = Array.from({ length }, (_, i) => {
-  //     const colTotal = store.rows.reduce((acc, group) => {
-  //       const gTotal = group.rows.reduce((acc, row) => {
-  //         return acc + row.cells[i].value;
-  //       }, 0);
-  //       return acc + gTotal;
-  //     }, 0);
-  //     return colTotal;
-  //   });
-  //   return [...totals, totals.reduce((acc, total) => acc + total, 0)];
-  // });
   return (
     <div>
       {/* <RenderOtherUsers /> */}
       <Show when={store.rows.length}>
-        {/* <div style={{ display: "flex", "flex-direction": "row" }}>
-          <p style={{ "min-width": rowHeaderWidth + "px" }}>Grand totals</p>
-          <For each={totalsOfTotals()}>{total => <TotalCell value={total} />}</For>
-        </div> */}
         <For each={store.rows}>{row => <RenderRow row={row} />}</For>
       </Show>
     </div>
@@ -332,26 +318,6 @@ const isBadNumber = (num: number) => {
   return Number.isNaN(num) || num === Infinity || num === -Infinity || num < 0;
 };
 
-// const RenderGroup = (props: { group: Group }) => {
-//   const totals = createMemo(() => {
-//     const length = props.group.rows[0].cells.length;
-//     const totals = Array.from({ length }, (_, i) => {
-//       return props.group.rows.reduce((acc, row) => acc + row.cells[i].value, 0);
-//     });
-//     return [...totals, totals.reduce((acc, total) => acc + total, 0)];
-//   });
-//   return (
-//     <div>
-//       <div style={{ display: "flex", "flex-direction": "row" }}>
-//         <p style={{ "min-width": rowHeaderWidth + "px" }}>{props.group.name}</p>
-//         <For each={totals()}>{value => <TotalCell value={value} />}</For>
-//       </div>
-//       <div>
-//         <For each={props.group.rows}>{row => <RenderRow row={row} />}</For>
-//       </div>
-//     </div>
-//   );
-// };
 
 const TotalCell = (props: { value: number }) => {
   return (
@@ -401,6 +367,20 @@ const RenderCell = (props: { cell: DataPoint; parentRows: Row[]; cellIndex: numb
             }, store.rows);
           })
         );
+        client
+          .mutation(
+            `
+          mutation($id: ID!, $value: Float!) {
+            setDataPoint(id: $id, value: $value) {
+              id
+            }
+          }`,
+            {
+              id: props.cell.id,
+              value: newValue,
+            }
+          )
+          .toPromise();
       }}
     />
   );
